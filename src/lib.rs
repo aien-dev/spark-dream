@@ -68,6 +68,17 @@ impl DreamEngine {
         }
     }
 
+    
+    pub fn get_token_secure(&self) -> String {
+        // First try hardware TPM vault environment
+        if let Ok(t) = std::env::var("CORTEX_TOKEN") {
+            if !t.trim().is_empty() {
+                return t.trim().to_string();
+            }
+        }
+        self.get_cortex_token()
+    }
+
     pub fn get_cortex_token(&self) -> String {
         fs::read_to_string(&self.cortex_token_path)
             .unwrap_or_default()
@@ -117,7 +128,7 @@ impl DreamEngine {
         content: &str,
         metadata: &Value,
     ) -> Result<Value, String> {
-        let token = self.get_cortex_token();
+        let token = self.get_token_secure();
         let payload = json!({
             "kind": "entity",
             "value": {
