@@ -1,10 +1,3 @@
-fn default_basecamp_dir() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join("basecamp")
-}
-
 use clap::{Parser, Subcommand};
 use spark_dream::DreamEngine;
 use std::path::PathBuf;
@@ -12,9 +5,12 @@ use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug)]
-#[command(name = "spark-dream", about = "Native Rust Dynamic Dream Cycle Engine for SparkOS")]
+#[command(
+    name = "spark-dream",
+    about = "Native Rust Dynamic Dream Cycle Engine for SparkOS"
+)]
 struct Cli {
-    #[arg(long, default_value_os_t = default_basecamp_dir())]
+    #[arg(long, default_value_os_t = default_dream_basecamp())]
     basecamp: PathBuf,
 
     #[arg(long)]
@@ -35,6 +31,14 @@ enum Commands {
     Daemon,
     /// Check current dream cycle status and telemetry
     Status,
+}
+
+fn default_dream_basecamp() -> PathBuf {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("."));
+    home.join("basecamp")
 }
 
 #[tokio::main]
@@ -78,7 +82,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         Commands::Daemon => {
-            println!("🌌 Starting native sovereign dream daemon (idle threshold: {}s)...", cli.idle_threshold);
+            println!(
+                "🌌 Starting native sovereign dream daemon (idle threshold: {}s)...",
+                cli.idle_threshold
+            );
             let mut ticker = tokio::time::interval(Duration::from_secs(60));
 
             loop {
@@ -97,7 +104,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let idle_secs = (now - last_act).num_seconds().max(0) as u64;
 
                     if idle_secs >= cli.idle_threshold {
-                        tracing::info!("Operator idle for {}s with 0% GPU load. Initiating dream cycle.", idle_secs);
+                        tracing::info!(
+                            "Operator idle for {}s with 0% GPU load. Initiating dream cycle.",
+                            idle_secs
+                        );
                         if let Err(e) = engine.execute_dream_cycle().await {
                             tracing::warn!("Dream cycle error: {}", e);
                         }

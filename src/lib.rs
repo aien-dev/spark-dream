@@ -162,7 +162,8 @@ pub fn extract_discovery_from_markdown(path: &Path, raw_content: &str) -> Option
     let mut finding: Option<String> = None;
     for line in trimmed.lines() {
         let l = line.trim();
-        if l.starts_with("- finding:") || l.starts_with("- Finding:") || l.starts_with("* Finding:") {
+        if l.starts_with("- finding:") || l.starts_with("- Finding:") || l.starts_with("* Finding:")
+        {
             if let Some((_, val)) = l.split_once(':') {
                 finding = Some(val.trim().to_string());
                 break;
@@ -222,9 +223,10 @@ impl DreamEngine {
         let dream_dir = base_dir.join("aien-dream");
         let home = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
-            .unwrap_or_else(|_| ".".to_string());
-        let park_dir = PathBuf::from(&home).join("atlas-prime-workspace/park");
-        let cortex_token_path = PathBuf::from(&home).join(".config/cortex/token");
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("."));
+        let park_dir = home.join("atlas-prime-workspace/park");
+        let cortex_token_path = home.join(".config/cortex/token");
 
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
@@ -273,7 +275,10 @@ impl DreamEngine {
     /// Read GPU telemetry directly from nvidia-smi / /proc without python overhead
     pub async fn get_gpu_utilization(&self) -> u32 {
         let output = tokio::process::Command::new("nvidia-smi")
-            .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
+            .args([
+                "--query-gpu=utilization.gpu",
+                "--format=csv,noheader,nounits",
+            ])
             .output()
             .await;
 
@@ -324,7 +329,8 @@ impl DreamEngine {
             }
         });
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/api/cortex/write", self.cortex_url))
             .header("Authorization", format!("Bearer {}", token))
             .header("Content-Type", "application/json")
@@ -334,7 +340,10 @@ impl DreamEngine {
             .map_err(|e| format!("Cortex request failed: {}", e))?;
 
         if resp.status().is_success() {
-            let res_json = resp.json::<Value>().await.unwrap_or_else(|_| json!({"status": "ok"}));
+            let res_json = resp
+                .json::<Value>()
+                .await
+                .unwrap_or_else(|_| json!({"status": "ok"}));
             Ok(res_json)
         } else {
             Err(format!("Cortex returned status {}", resp.status()))
@@ -362,12 +371,24 @@ impl DreamEngine {
                             }
 
                             if let Some(item) = extract_discovery_from_markdown(&path, &content) {
-                                match self.commit_to_cortex(&item.item_type, &item.canonical_name, &item.text, &item.metadata).await {
+                                match self
+                                    .commit_to_cortex(
+                                        &item.item_type,
+                                        &item.canonical_name,
+                                        &item.text,
+                                        &item.metadata,
+                                    )
+                                    .await
+                                {
                                     Ok(_) => {
                                         committed += 1;
                                         // Archive parked note
-                                        let archive_name = format!("{}.consolidated", path.file_name().unwrap().to_string_lossy());
-                                        let _ = fs::rename(&path, path.with_file_name(archive_name));
+                                        let archive_name = format!(
+                                            "{}.consolidated",
+                                            path.file_name().unwrap().to_string_lossy()
+                                        );
+                                        let _ =
+                                            fs::rename(&path, path.with_file_name(archive_name));
                                     }
                                     Err(_) => {
                                         rejected += 1;
@@ -431,7 +452,9 @@ Directly map fp4 quantized tensor blocks without conversion overhead."#;
         let tags = item.metadata["tags"].as_array().unwrap();
         assert_eq!(tags.len(), 3);
         assert_eq!(tags[0], "vllm");
-        assert!(item.text.contains("Directly map fp4 quantized tensor blocks"));
+        assert!(item
+            .text
+            .contains("Directly map fp4 quantized tensor blocks"));
         assert!(!item.text.contains("subsystem: neural_weights"));
     }
 
@@ -456,7 +479,10 @@ Discovered unified 128GB LPDDR5X bus between CPU and dual Blackwell GPUs."#;
 - Verification: 100% pass rate"#;
 
         let item = extract_discovery_from_markdown(&path, content).expect("extracted item");
-        assert_eq!(item.canonical_name, "SQLite WAL checkpoint stalls under massive bulk insert");
+        assert_eq!(
+            item.canonical_name,
+            "SQLite WAL checkpoint stalls under massive bulk insert"
+        );
         assert_eq!(item.item_type, "discovery");
         assert_eq!(item.metadata["layout"], "bullet_finding");
     }
@@ -470,7 +496,10 @@ Discovered unified 128GB LPDDR5X bus between CPU and dual Blackwell GPUs."#;
         assert_eq!(item.canonical_name, "parked-parked-hotfix-123");
         assert_eq!(item.item_type, "discovery");
         assert_eq!(item.metadata["layout"], "raw");
-        assert_eq!(item.text, "Fixed zero-length embedding cosine calculation crash.");
+        assert_eq!(
+            item.text,
+            "Fixed zero-length embedding cosine calculation crash."
+        );
     }
 
     #[test]
@@ -483,7 +512,9 @@ Valid body content that must not be discarded."#;
 
         let item = extract_discovery_from_markdown(&path, content).expect("recovers cleanly");
         assert_eq!(item.canonical_name, "Actual Title Here");
-        assert!(item.text.contains("Valid body content that must not be discarded"));
+        assert!(item
+            .text
+            .contains("Valid body content that must not be discarded"));
     }
 
     #[test]
@@ -522,7 +553,8 @@ Valid body content that must not be discarded."#;
 
     #[test]
     fn test_last_session_activity_detection() {
-        let temp_dir = std::env::temp_dir().join(format!("spark_dream_test_sessions_{}", Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("spark_dream_test_sessions_{}", Uuid::new_v4()));
         let sessions_dir = temp_dir.join("sessions");
         fs::create_dir_all(&sessions_dir).unwrap();
 
@@ -583,7 +615,8 @@ Valid body content that must not be discarded."#;
         });
 
         // Set up test directories
-        let temp_dir = std::env::temp_dir().join(format!("spark_dream_cycle_test_{}", Uuid::new_v4()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("spark_dream_cycle_test_{}", Uuid::new_v4()));
         let park_dir = temp_dir.join("park");
         fs::create_dir_all(&park_dir).unwrap();
 
@@ -605,7 +638,10 @@ Valid body content that must not be discarded."#;
             .with_park_dir(park_dir.clone());
 
         // Execute dream cycle
-        let state = engine.execute_dream_cycle().await.expect("dream cycle executed");
+        let state = engine
+            .execute_dream_cycle()
+            .await
+            .expect("dream cycle executed");
 
         assert_eq!(state.facts_committed, 1);
         assert_eq!(state.facts_rejected, 0);
